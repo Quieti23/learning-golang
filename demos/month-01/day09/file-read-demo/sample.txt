@@ -1,0 +1,2 @@
+hello from sample file
+this file is for defer and error wrapping demo
