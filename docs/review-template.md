@@ -12,6 +12,23 @@
 - 本周完成的练习：
 - 本周新增的笔记：
 
+go mod init 是用来初始化 module 的
+go run . 是运行当前目录程序
+go test  是跑测试
+Go 程序的入口是 package main 和 func main()
+
+Go 里局部变量常用 :=
+常量用 const
+for 是 Go 的统一循环结构
+if 条件不用加括号
+switch 默认不会自动穿透到下一个 case
+
+Java 常用 try/catch 处理异常
+Go 更常见的是函数返回 error
+Java 容易把错误处理藏进调用链
+Go 更强调显式处理，调用处更清楚，但代码会更啰嗦
+Go 不鼓励把所有问题都当异常机制处理
+
 ### 2. 我现在真的会了什么
 
 只写可以独立做出来或讲清楚的内容：
