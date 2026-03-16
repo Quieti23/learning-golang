@@ -35,11 +35,31 @@ defer 在函数返回前执行
 错误包装能保留原始错误并补充上下文
 出错路径也需要主动验证，不只看成功路径
 
+Go 默认是传值
+指针保存的是地址，不是值本身
+& 是取地址
+* 是通过地址访问值
+当函数需要修改外部状态时，传指针通常更合适
+
 struct tag 可以控制 JSON 字段名
 Go 的 JSON 编解码依赖导出字段
 Marshal 是 Go 到 JSON
 Unmarshal 是 JSON 到 Go
 字段类型不匹配时，解码会报错
+
+
+net/http 可以直接写最小服务，不需要框架
+handler 通过 http.ResponseWriter 写响应
+handler 通过 *http.Request 读取请求
+http.ListenAndServe 会启动一个监听端口的 HTTP 服务
+后端接口必须实际请求验证，不能只看代码
+
+
+r.Body 是 HTTP 请求体
+json.NewDecoder(...).Decode(...) 可以把 JSON 解到 struct
+JSON 字段类型不匹配时，解码会失败
+返回 JSON 时要设置 Content-Type
+创建类接口通常不应只返回纯文本
 
 ### 2. 我现在真的会了什么
 
