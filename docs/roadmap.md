@@ -114,4 +114,5 @@
 
 - 第 1 个月：建立 Go 基础与最小项目能力，完成 Todo API → `plans/month-01/README.md`
 - 第 2 个月：写出更像后端服务的代码，完成 Blog API → `plans/month-02/README.md`
-- 第 3 个月及之后：根据实际进度细化，当前阶段核心是把前两个月做扎实
+- 第 3 个月：强化并发、context、性能基础，完成任务处理服务 → `plans/month-03/README.md`
+- 第 4 个月及之后：继续围绕综合项目、面试表达和工程化能力细化
