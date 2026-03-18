@@ -86,3 +86,13 @@
 ## 8. 一句话总结
 
 这个 Todo API 的价值不在于功能复杂，而在于已经把 Go 后端最基础的一条线跑通了：定义数据、处理 HTTP、组织分层、返回 JSON、做基础测试，并且能解释为什么这样组织。
+
+
+
+main -> handler -> service -> store -> model
+
+main：装配依赖、启动服务
+handler：处理 HTTP 请求和响应
+service：处理业务规则
+store/repository：处理数据存取
+model：定义数据结构
