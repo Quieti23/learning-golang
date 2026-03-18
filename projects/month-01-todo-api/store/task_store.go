@@ -10,7 +10,7 @@ import (
 var ErrTaskNotFound = errors.New("task not found")
 
 type TaskStore struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	nextID int
 	tasks  []model.Task
 }
@@ -37,8 +37,8 @@ func (s *TaskStore) Create(title string) model.Task {
 }
 
 func (s *TaskStore) List() []model.Task {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	result := make([]model.Task, len(s.tasks))
 	copy(result, s.tasks)
@@ -46,8 +46,8 @@ func (s *TaskStore) List() []model.Task {
 }
 
 func (s *TaskStore) GetByID(id int) (model.Task, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	for _, task := range s.tasks {
 		if task.ID == id {

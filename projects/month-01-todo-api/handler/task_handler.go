@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -39,44 +41,32 @@ func (h *TaskHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *TaskHandler) handleTasks(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-
 		writeJSON(w, http.StatusOK, h.service.List())
 	case http.MethodPost:
 		defer r.Body.Close()
 
 		var request createTaskRequest
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			writeJSON(w, http.StatusBadRequest, errorResponse{Message: "invalid JSON body"})
+		if err := decodeJSONBody(r, &request); err != nil {
+			writeErrorJSON(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
 		task, err := h.service.Create(request.Title)
 		if err != nil {
-			if err == service.ErrTitleRequired {
-				writeJSON(w, http.StatusBadRequest, errorResponse{Message: err.Error()})
-				return
-			}
-
-			writeJSON(w, http.StatusInternalServerError, errorResponse{Message: "internal server error"})
+			h.writeServiceError(w, err)
 			return
 		}
 
 		writeJSON(w, http.StatusCreated, task)
 	default:
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Message: "method not allowed"})
+		writeErrorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
 func (h *TaskHandler) handleTaskByID(w http.ResponseWriter, r *http.Request) {
-	idText := strings.TrimPrefix(r.URL.Path, "/tasks/")
-	if idText == "" || strings.Contains(idText, "/") {
-		writeJSON(w, http.StatusBadRequest, errorResponse{Message: "invalid task id"})
-		return
-	}
-
-	id, err := strconv.Atoi(idText)
+	id, err := parseTaskID(r.URL.Path)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse{Message: "invalid task id"})
+		writeErrorJSON(w, http.StatusBadRequest, "invalid task id")
 		return
 	}
 
@@ -88,19 +78,14 @@ func (h *TaskHandler) handleTaskByID(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		h.handleDeleteTask(w, id)
 	default:
-		writeJSON(w, http.StatusMethodNotAllowed, errorResponse{Message: "method not allowed"})
+		writeErrorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
 func (h *TaskHandler) handleGetTaskByID(w http.ResponseWriter, id int) {
 	task, err := h.service.GetByID(id)
 	if err != nil {
-		if err == store.ErrTaskNotFound {
-			writeJSON(w, http.StatusNotFound, errorResponse{Message: err.Error()})
-			return
-		}
-
-		writeJSON(w, http.StatusInternalServerError, errorResponse{Message: "internal server error"})
+		h.writeServiceError(w, err)
 		return
 	}
 
@@ -111,8 +96,8 @@ func (h *TaskHandler) handleUpdateTask(w http.ResponseWriter, r *http.Request, i
 	defer r.Body.Close()
 
 	var request updateTaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		writeJSON(w, http.StatusBadRequest, errorResponse{Message: "invalid JSON body"})
+	if err := decodeJSONBody(r, &request); err != nil {
+		writeErrorJSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -121,14 +106,7 @@ func (h *TaskHandler) handleUpdateTask(w http.ResponseWriter, r *http.Request, i
 		Done:  request.Done,
 	})
 	if err != nil {
-		switch err {
-		case service.ErrTitleRequired:
-			writeJSON(w, http.StatusBadRequest, errorResponse{Message: err.Error()})
-		case store.ErrTaskNotFound:
-			writeJSON(w, http.StatusNotFound, errorResponse{Message: err.Error()})
-		default:
-			writeJSON(w, http.StatusInternalServerError, errorResponse{Message: "internal server error"})
-		}
+		h.writeServiceError(w, err)
 		return
 	}
 
@@ -138,20 +116,58 @@ func (h *TaskHandler) handleUpdateTask(w http.ResponseWriter, r *http.Request, i
 func (h *TaskHandler) handleDeleteTask(w http.ResponseWriter, id int) {
 	err := h.service.Delete(id)
 	if err != nil {
-		if err == store.ErrTaskNotFound {
-			writeJSON(w, http.StatusNotFound, errorResponse{Message: err.Error()})
-			return
-		}
-
-		writeJSON(w, http.StatusInternalServerError, errorResponse{Message: "internal server error"})
+		h.writeServiceError(w, err)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *TaskHandler) writeServiceError(w http.ResponseWriter, err error) {
+	switch err {
+	case service.ErrTitleRequired:
+		writeErrorJSON(w, http.StatusBadRequest, err.Error())
+	case store.ErrTaskNotFound:
+		writeErrorJSON(w, http.StatusNotFound, err.Error())
+	default:
+		writeErrorJSON(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func writeErrorJSON(w http.ResponseWriter, statusCode int, message string) {
+	writeJSON(w, statusCode, errorResponse{Message: message})
+}
+
 func writeJSON(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	_ = json.NewEncoder(w).Encode(data)
+}
+
+func decodeJSONBody(r *http.Request, dst any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(dst); err != nil {
+		if errors.Is(err, io.EOF) {
+			return errors.New("request body is required")
+		}
+
+		return errors.New("invalid JSON body")
+	}
+
+	if decoder.More() {
+		return errors.New("request body must contain only one JSON object")
+	}
+
+	return nil
+}
+
+func parseTaskID(path string) (int, error) {
+	idText := strings.TrimPrefix(path, "/tasks/")
+	if idText == "" || strings.Contains(idText, "/") {
+		return 0, strconv.ErrSyntax
+	}
+
+	return strconv.Atoi(idText)
 }

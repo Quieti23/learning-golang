@@ -61,3 +61,9 @@
 - 如果面试官问你怎么用 Go 写一个简单 HTTP 服务，你能否说清并写出骨架
 - 如果让你解释 Go 错误处理和 Java 异常差异，你能否举例说明
 - 如果让你展示一个练习项目，你是否有东西可以打开就讲
+
+第一问，你已经基本可以回答“怎么用 Go 写一个简单 HTTP 服务”，而且也能写出骨架。最小骨架你已经实际做过，在 demos/month-01/day11/http-ping-demo/main.go 和 projects/month-01-todo-api/main.go。你现在至少应该能说清这条主线：用标准库 net/http，先定义 main，再注册路由和 handler，最后用 http.ListenAndServe 启动服务。handler 通过 http.ResponseWriter 写响应，通过 *http.Request 读请求。如果面试官让你现场写，一个最小 /ping 服务你应该已经能写出来。
+
+第二问，你也已经可以解释 Go 错误处理和 Java 异常差异，而且这是你这个阶段的一个优势点。你的回答不用太大，抓住 4 个点就够了：Java 常见是 try/catch 和异常链，Go 更常见是函数显式返回 error；Java 容易把错误处理藏在调用链里，Go 会在调用处显式判断 if err != nil；Go 代码会更啰嗦，但错误路径更直接；Go 不鼓励把常规业务问题都走异常机制。你前面做过的错误处理例子就在 demos/month-01/day03/error.go 和 projects/month-01-todo-api/handler/task_handler.go，完全可以拿“空标题返回业务错误”“任务不存在返回明确错误”来举例。
+
+第三问，你现在已经有一个可以打开就讲的练习项目，就是 projects/month-01-todo-api。而且这个项目不只是 demo，已经具备了可讲述的结构：入口在 projects/month-01-todo-api/main.go，HTTP 层在 projects/month-01-todo-api/handler/task_handler.go，业务层在 projects/month-01-todo-api/service/task_service.go，存储层在 projects/month-01-todo-api/store/task_store.go。如果让你讲项目，你可以按“做了什么接口”“为什么这样分层”“怎么做错误返回”“怎么做测试”这条顺序讲，复盘材料也已经在 projects/month-01-todo-api/PROJECT-REVIEW.md。
