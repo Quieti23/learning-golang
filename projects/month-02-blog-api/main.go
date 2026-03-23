@@ -1,10 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
+
+	_ "github.com/go-sql-driver/mysql"
 
 	"month02blogapi/config"
 	"month02blogapi/handler"
@@ -21,7 +24,23 @@ func main() {
 		return
 	}
 
-	postRepository := repository.NewInMemoryPostRepository()
+	db, err := sql.Open("mysql", appConfig.MySQLDSN)
+	if err != nil {
+		logger.Error("open mysql failed", "error", err)
+		return
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		logger.Error("ping mysql failed", "error", err)
+		return
+	}
+
+	db.SetMaxOpenConns(appConfig.MaxOpenConns)
+	db.SetMaxIdleConns(appConfig.MaxIdleConns)
+	db.SetConnMaxLifetime(appConfig.ConnMaxLifetime())
+
+	postRepository := repository.NewMySQLPostRepository(db)
 	postService := service.NewPostService(postRepository)
 	postHandler := handler.NewPostHandler(postService, logger.With("component", "post_handler"))
 
@@ -32,7 +51,14 @@ func main() {
 	})
 	postHandler.RegisterRoutes(mux)
 
-	logger.Info("blog api starting", "address", appConfig.Address())
+	logger.Info(
+		"blog api starting",
+		"address", appConfig.Address(),
+		"database", "mysql",
+		"max_open_conns", appConfig.MaxOpenConns,
+		"max_idle_conns", appConfig.MaxIdleConns,
+		"conn_max_lifetime_minutes", appConfig.ConnMaxLifetimeMins,
+	)
 	if err := http.ListenAndServe(appConfig.Address(), mux); err != nil {
 		logger.Error("server stopped", "error", err)
 	}
