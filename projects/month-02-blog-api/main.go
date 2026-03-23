@@ -11,6 +11,7 @@ import (
 
 	"month02blogapi/config"
 	"month02blogapi/handler"
+	"month02blogapi/middleware"
 	"month02blogapi/repository"
 	"month02blogapi/service"
 )
@@ -50,6 +51,7 @@ func main() {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "pong"})
 	})
 	postHandler.RegisterRoutes(mux)
+	serverHandler := middleware.RequestLogger(logger.With("component", "http_middleware"))(mux)
 
 	logger.Info(
 		"blog api starting",
@@ -59,7 +61,7 @@ func main() {
 		"max_idle_conns", appConfig.MaxIdleConns,
 		"conn_max_lifetime_minutes", appConfig.ConnMaxLifetimeMins,
 	)
-	if err := http.ListenAndServe(appConfig.Address(), mux); err != nil {
+	if err := http.ListenAndServe(appConfig.Address(), serverHandler); err != nil {
 		logger.Error("server stopped", "error", err)
 	}
 }
