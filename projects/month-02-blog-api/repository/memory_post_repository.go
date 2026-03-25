@@ -1,7 +1,7 @@
 package repository
 
-
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -21,7 +21,11 @@ func NewInMemoryPostRepository() *InMemoryPostRepository {
 	}
 }
 
-func (r *InMemoryPostRepository) List() ([]model.Post, error) {
+func (r *InMemoryPostRepository) List(ctx context.Context) ([]model.Post, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -30,7 +34,11 @@ func (r *InMemoryPostRepository) List() ([]model.Post, error) {
 	return result, nil
 }
 
-func (r *InMemoryPostRepository) Create(post model.Post) (model.Post, error) {
+func (r *InMemoryPostRepository) Create(ctx context.Context, post model.Post) (model.Post, error) {
+	if err := ctx.Err(); err != nil {
+		return model.Post{}, err
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -44,7 +52,11 @@ func (r *InMemoryPostRepository) Create(post model.Post) (model.Post, error) {
 	return post, nil
 }
 
-func (r *InMemoryPostRepository) GetByID(id int) (model.Post, error) {
+func (r *InMemoryPostRepository) GetByID(ctx context.Context, id int) (model.Post, error) {
+	if err := ctx.Err(); err != nil {
+		return model.Post{}, err
+	}
+
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -57,7 +69,11 @@ func (r *InMemoryPostRepository) GetByID(id int) (model.Post, error) {
 	return model.Post{}, ErrPostNotFound
 }
 
-func (r *InMemoryPostRepository) Update(post model.Post) (model.Post, error) {
+func (r *InMemoryPostRepository) Update(ctx context.Context, post model.Post) (model.Post, error) {
+	if err := ctx.Err(); err != nil {
+		return model.Post{}, err
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -73,7 +89,11 @@ func (r *InMemoryPostRepository) Update(post model.Post) (model.Post, error) {
 	return model.Post{}, ErrPostNotFound
 }
 
-func (r *InMemoryPostRepository) Delete(id int) error {
+func (r *InMemoryPostRepository) Delete(ctx context.Context, id int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

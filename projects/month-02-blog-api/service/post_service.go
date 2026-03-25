@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -25,11 +26,11 @@ type UpdatePostInput struct {
 }
 
 type PostService interface {
-	List() ([]model.Post, error)
-	Create(input CreatePostInput) (model.Post, error)
-	GetByID(id int) (model.Post, error)
-	Update(id int, input UpdatePostInput) (model.Post, error)
-	Delete(id int) error
+	List(ctx context.Context) ([]model.Post, error)
+	Create(ctx context.Context, input CreatePostInput) (model.Post, error)
+	GetByID(ctx context.Context, id int) (model.Post, error)
+	Update(ctx context.Context, id int, input UpdatePostInput) (model.Post, error)
+	Delete(ctx context.Context, id int) error
 }
 
 type DefaultPostService struct {
@@ -40,11 +41,11 @@ func NewPostService(postRepository repository.PostRepository) PostService {
 	return &DefaultPostService{repository: postRepository}
 }
 
-func (s *DefaultPostService) List() ([]model.Post, error) {
-	return s.repository.List()
+func (s *DefaultPostService) List(ctx context.Context) ([]model.Post, error) {
+	return s.repository.List(ctx)
 }
 
-func (s *DefaultPostService) Create(input CreatePostInput) (model.Post, error) {
+func (s *DefaultPostService) Create(ctx context.Context, input CreatePostInput) (model.Post, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.Content = strings.TrimSpace(input.Content)
 	input.Author = strings.TrimSpace(input.Author)
@@ -65,14 +66,14 @@ func (s *DefaultPostService) Create(input CreatePostInput) (model.Post, error) {
 		Author:  input.Author,
 	}
 
-	return s.repository.Create(post)
+	return s.repository.Create(ctx, post)
 }
 
-func (s *DefaultPostService) GetByID(id int) (model.Post, error) {
-	return s.repository.GetByID(id)
+func (s *DefaultPostService) GetByID(ctx context.Context, id int) (model.Post, error) {
+	return s.repository.GetByID(ctx, id)
 }
 
-func (s *DefaultPostService) Update(id int, input UpdatePostInput) (model.Post, error) {
+func (s *DefaultPostService) Update(ctx context.Context, id int, input UpdatePostInput) (model.Post, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.Content = strings.TrimSpace(input.Content)
 	input.Author = strings.TrimSpace(input.Author)
@@ -87,7 +88,7 @@ func (s *DefaultPostService) Update(id int, input UpdatePostInput) (model.Post, 
 		return model.Post{}, ErrAuthorRequired
 	}
 
-	post, err := s.repository.GetByID(id)
+	post, err := s.repository.GetByID(ctx, id)
 	if err != nil {
 		return model.Post{}, err
 	}
@@ -96,9 +97,9 @@ func (s *DefaultPostService) Update(id int, input UpdatePostInput) (model.Post, 
 	post.Content = input.Content
 	post.Author = input.Author
 
-	return s.repository.Update(post)
+	return s.repository.Update(ctx, post)
 }
 
-func (s *DefaultPostService) Delete(id int) error {
-	return s.repository.Delete(id)
+func (s *DefaultPostService) Delete(ctx context.Context, id int) error {
+	return s.repository.Delete(ctx, id)
 }

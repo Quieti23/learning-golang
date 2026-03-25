@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"month02blogapi/repository"
 	"month02blogapi/service"
@@ -17,6 +19,7 @@ import (
 type PostHandler struct {
 	service service.PostService
 	logger  *slog.Logger
+	timeout time.Duration
 }
 
 type createPostRequest struct {
@@ -35,8 +38,8 @@ type errorResponse struct {
 	Message string `json:"message"`
 }
 
-func NewPostHandler(postService service.PostService, logger *slog.Logger) *PostHandler {
-	return &PostHandler{service: postService, logger: logger}
+func NewPostHandler(postService service.PostService, logger *slog.Logger, timeout time.Duration) *PostHandler {
+	return &PostHandler{service: postService, logger: logger, timeout: timeout}
 }
 
 func (h *PostHandler) RegisterRoutes(mux *http.ServeMux) {
@@ -49,10 +52,12 @@ func (h *PostHandler) handlePosts(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		posts, err := h.service.List()
+		ctx, cancel := h.withRequestTimeout(r.Context())
+		defer cancel()
+
+		posts, err := h.service.List(ctx)
 		if err != nil {
-			requestLogger.Error("list posts failed", "error", err)
-			writeErrorJSON(w, http.StatusInternalServerError, "internal server error")
+			h.writeServiceError(requestLogger, w, err)
 			return
 		}
 		requestLogger.Info("list posts", "count", len(posts))
@@ -67,7 +72,10 @@ func (h *PostHandler) handlePosts(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		post, err := h.service.Create(service.CreatePostInput{
+		ctx, cancel := h.withRequestTimeout(r.Context())
+		defer cancel()
+
+		post, err := h.service.Create(ctx, service.CreatePostInput{
 			Title:   request.Title,
 			Content: request.Content,
 			Author:  request.Author,
@@ -103,7 +111,10 @@ func (h *PostHandler) handlePostByID(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		post, err := h.service.GetByID(id)
+		ctx, cancel := h.withRequestTimeout(r.Context())
+		defer cancel()
+
+		post, err := h.service.GetByID(ctx, id)
 		if err != nil {
 			h.writeServiceError(requestLogger, w, err)
 			return
@@ -121,7 +132,10 @@ func (h *PostHandler) handlePostByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		post, err := h.service.Update(id, service.UpdatePostInput{
+		ctx, cancel := h.withRequestTimeout(r.Context())
+		defer cancel()
+
+		post, err := h.service.Update(ctx, id, service.UpdatePostInput{
 			Title:   request.Title,
 			Content: request.Content,
 			Author:  request.Author,
@@ -134,7 +148,10 @@ func (h *PostHandler) handlePostByID(w http.ResponseWriter, r *http.Request) {
 		requestLogger.Info("post updated", "post_id", id)
 		writeJSON(w, http.StatusOK, post)
 	case http.MethodDelete:
-		if err := h.service.Delete(id); err != nil {
+		ctx, cancel := h.withRequestTimeout(r.Context())
+		defer cancel()
+
+		if err := h.service.Delete(ctx, id); err != nil {
 			h.writeServiceError(requestLogger, w, err)
 			return
 		}
@@ -156,6 +173,16 @@ func (h *PostHandler) writeServiceError(logger *slog.Logger, w http.ResponseWrit
 	case repository.ErrPostNotFound:
 		writeErrorJSON(w, http.StatusNotFound, err.Error())
 	default:
+		if errors.Is(err, context.DeadlineExceeded) {
+			writeErrorJSON(w, http.StatusGatewayTimeout, "request timeout")
+			return
+		}
+
+		if errors.Is(err, context.Canceled) {
+			writeErrorJSON(w, http.StatusRequestTimeout, "request canceled")
+			return
+		}
+
 		if errors.Is(err, repository.ErrPostNotFound) {
 			writeErrorJSON(w, http.StatusNotFound, repository.ErrPostNotFound.Error())
 			return
@@ -163,6 +190,14 @@ func (h *PostHandler) writeServiceError(logger *slog.Logger, w http.ResponseWrit
 
 		writeErrorJSON(w, http.StatusInternalServerError, "internal server error")
 	}
+}
+
+func (h *PostHandler) withRequestTimeout(parent context.Context) (context.Context, context.CancelFunc) {
+	if h.timeout <= 0 {
+		return parent, func() {}
+	}
+
+	return context.WithTimeout(parent, h.timeout)
 }
 
 func parsePostID(path string) (int, error) {

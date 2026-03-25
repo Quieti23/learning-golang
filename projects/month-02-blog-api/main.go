@@ -43,7 +43,7 @@ func main() {
 
 	postRepository := repository.NewMySQLPostRepository(db)
 	postService := service.NewPostService(postRepository)
-	postHandler := handler.NewPostHandler(postService, logger.With("component", "post_handler"))
+	postHandler := handler.NewPostHandler(postService, logger.With("component", "post_handler"), appConfig.RequestTimeout())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +60,7 @@ func main() {
 		"max_open_conns", appConfig.MaxOpenConns,
 		"max_idle_conns", appConfig.MaxIdleConns,
 		"conn_max_lifetime_minutes", appConfig.ConnMaxLifetimeMins,
+		"request_timeout_ms", appConfig.RequestTimeoutMs,
 	)
 	if err := http.ListenAndServe(appConfig.Address(), serverHandler); err != nil {
 		logger.Error("server stopped", "error", err)

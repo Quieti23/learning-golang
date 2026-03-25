@@ -23,6 +23,7 @@
 
 - `config.json`：当前用来配置服务端口和 MySQL DSN
 - 也包含连接池配置：`max_open_conns`、`max_idle_conns`、`conn_max_lifetime_minutes`
+- `request_timeout_ms`：控制单个 HTTP 请求传入数据库操作的超时时间
 
 ## 当前接口
 
@@ -36,8 +37,10 @@
 ## 当前数据库实现
 
 - Blog API 当前已经切到 MySQL repository
-- `Create`、`List`、`GetByID`、`Update`、`Delete` 都通过 `database/sql` 访问 `posts` 表
+- handler 会把请求 `context` 传到 service 和 repository
+- `Create`、`List`、`GetByID`、`Update`、`Delete` 都通过 `QueryContext`、`QueryRowContext`、`ExecContext` 访问 `posts` 表
 - `sql.ErrNoRows` 会在 repository 层转换成 `post not found`
+- 超时会返回 `504 request timeout`
 - handler 层会把常见错误映射成 `400 / 404 / 500`
 - `main.go` 会应用基础连接池配置
 
@@ -79,7 +82,8 @@ Invoke-RestMethod http://localhost:8081/ping
 	"mysql_dsn": "root:password@tcp(127.0.0.1:3306)/your_database?parseTime=true",
 	"max_open_conns": 10,
 	"max_idle_conns": 5,
-	"conn_max_lifetime_minutes": 5
+	"conn_max_lifetime_minutes": 5,
+	"request_timeout_ms": 3000
 }
 ```
 
@@ -158,4 +162,5 @@ Invoke-WebRequest -Method Post http://localhost:8081/posts \
 - 不存在的文章返回 `404`
 - 缺少必填字段返回 `400`
 - 多余字段或非法 JSON 返回 `400`
+- 数据库调用超过 `request_timeout_ms` 时返回 `504`
 - 正常 CRUD 返回 `200 / 201 / 204`

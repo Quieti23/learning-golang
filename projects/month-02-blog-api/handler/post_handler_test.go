@@ -2,12 +2,14 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"month02blogapi/model"
 	"month02blogapi/repository"
@@ -102,6 +104,24 @@ func TestPostHandlerRejectsInvalidPostID(t *testing.T) {
 	}
 }
 
+func TestPostHandlerReturnsGatewayTimeoutWhenServiceContextExpires(t *testing.T) {
+	repo := &blockingPostRepository{}
+	svc := service.NewPostService(repo)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := NewPostHandler(svc, logger, 10*time.Millisecond)
+
+	response := performJSONRequest[errorResponse](t, h, http.MethodGet, "/posts", "")
+	if response.statusCode != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, response.statusCode)
+	}
+	if response.body.Message != "request timeout" {
+		t.Fatalf("unexpected error message: %q", response.body.Message)
+	}
+	if !repo.deadlineSet {
+		t.Fatal("expected handler to pass a context with deadline")
+	}
+}
+
 type tCreatePostResponse struct {
 	ID int `json:"id"`
 }
@@ -115,7 +135,33 @@ func newTestHandler() *PostHandler {
 	repo := repository.NewInMemoryPostRepository()
 	svc := service.NewPostService(repo)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return NewPostHandler(svc, logger)
+	return NewPostHandler(svc, logger, time.Second)
+}
+
+type blockingPostRepository struct {
+	deadlineSet bool
+}
+
+func (r *blockingPostRepository) List(ctx context.Context) ([]model.Post, error) {
+	_, r.deadlineSet = ctx.Deadline()
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (r *blockingPostRepository) Create(ctx context.Context, post model.Post) (model.Post, error) {
+	return model.Post{}, ctx.Err()
+}
+
+func (r *blockingPostRepository) GetByID(ctx context.Context, id int) (model.Post, error) {
+	return model.Post{}, ctx.Err()
+}
+
+func (r *blockingPostRepository) Update(ctx context.Context, post model.Post) (model.Post, error) {
+	return model.Post{}, ctx.Err()
+}
+
+func (r *blockingPostRepository) Delete(ctx context.Context, id int) error {
+	return ctx.Err()
 }
 
 func performRequest(t *testing.T, h *PostHandler, method, path, body string) *httptest.ResponseRecorder {

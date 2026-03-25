@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"regexp"
@@ -41,7 +42,7 @@ func TestMySQLPostRepositoryList(t *testing.T) {
 		ORDER BY id DESC
 	`)).WillReturnRows(rows)
 
-	posts, err := repo.List()
+	posts, err := repo.List(context.Background())
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -68,7 +69,7 @@ func TestMySQLPostRepositoryListReturnsQueryError(t *testing.T) {
 		ORDER BY id DESC
 	`)).WillReturnError(errors.New("query failed"))
 
-	_, err := repo.List()
+	_, err := repo.List(context.Background())
 	if err == nil || err.Error() != "query failed" {
 		t.Fatalf("List() error = %v, want query failed", err)
 	}
@@ -90,7 +91,7 @@ func TestMySQLPostRepositoryListReturnsScanError(t *testing.T) {
 		ORDER BY id DESC
 	`)).WillReturnRows(rows)
 
-	_, err := repo.List()
+	_, err := repo.List(context.Background())
 	if err == nil {
 		t.Fatal("List() error = nil, want scan error")
 	}
@@ -130,7 +131,7 @@ func TestMySQLPostRepositoryCreate(t *testing.T) {
 		WithArgs(int64(3)).
 		WillReturnRows(rows)
 
-	created, err := repo.Create(input)
+	created, err := repo.Create(context.Background(), input)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -164,7 +165,7 @@ func TestMySQLPostRepositoryCreateReturnsExecError(t *testing.T) {
 		WithArgs(input.Title, input.Content, input.Author).
 		WillReturnError(errors.New("insert failed"))
 
-	_, err := repo.Create(input)
+	_, err := repo.Create(context.Background(), input)
 	if err == nil || err.Error() != "insert failed" {
 		t.Fatalf("Create() error = %v, want insert failed", err)
 	}
@@ -194,7 +195,7 @@ func TestMySQLPostRepositoryCreateReturnsQueryError(t *testing.T) {
 		WithArgs(int64(3)).
 		WillReturnError(errors.New("select failed"))
 
-	_, err := repo.Create(input)
+	_, err := repo.Create(context.Background(), input)
 	if err == nil || err.Error() != "select failed" {
 		t.Fatalf("Create() error = %v, want select failed", err)
 	}
@@ -216,7 +217,7 @@ func TestMySQLPostRepositoryCreateReturnsLastInsertIDError(t *testing.T) {
 		WithArgs(input.Title, input.Content, input.Author).
 		WillReturnResult(sqlmock.NewErrorResult(errors.New("last insert id failed")))
 
-	_, err := repo.Create(input)
+	_, err := repo.Create(context.Background(), input)
 	if err == nil || err.Error() != "last insert id failed" {
 		t.Fatalf("Create() error = %v, want last insert id failed", err)
 	}
@@ -243,7 +244,7 @@ func TestMySQLPostRepositoryGetByID(t *testing.T) {
 		WithArgs(8).
 		WillReturnRows(rows)
 
-	post, err := repo.GetByID(8)
+	post, err := repo.GetByID(context.Background(), 8)
 	if err != nil {
 		t.Fatalf("GetByID() error = %v", err)
 	}
@@ -267,7 +268,7 @@ func TestMySQLPostRepositoryGetByIDReturnsNotFound(t *testing.T) {
 		WithArgs(99).
 		WillReturnError(sql.ErrNoRows)
 
-	_, err := repo.GetByID(99)
+	_, err := repo.GetByID(context.Background(), 99)
 	if !errors.Is(err, ErrPostNotFound) {
 		t.Fatalf("GetByID() error = %v, want %v", err, ErrPostNotFound)
 	}
@@ -288,7 +289,7 @@ func TestMySQLPostRepositoryGetByIDReturnsOtherError(t *testing.T) {
 		WithArgs(7).
 		WillReturnError(errors.New("db unavailable"))
 
-	_, err := repo.GetByID(7)
+	_, err := repo.GetByID(context.Background(), 7)
 	if err == nil || err.Error() != "db unavailable" {
 		t.Fatalf("GetByID() error = %v, want db unavailable", err)
 	}
@@ -330,7 +331,7 @@ func TestMySQLPostRepositoryUpdate(t *testing.T) {
 		WithArgs(input.ID).
 		WillReturnRows(rows)
 
-	updated, err := repo.Update(input)
+	updated, err := repo.Update(context.Background(), input)
 	if err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
@@ -361,7 +362,7 @@ func TestMySQLPostRepositoryUpdateReturnsNotFound(t *testing.T) {
 		WithArgs(post.Title, post.Content, post.Author, post.ID).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	_, err := repo.Update(post)
+	_, err := repo.Update(context.Background(), post)
 	if !errors.Is(err, ErrPostNotFound) {
 		t.Fatalf("Update() error = %v, want %v", err, ErrPostNotFound)
 	}
@@ -378,7 +379,7 @@ func TestMySQLPostRepositoryDelete(t *testing.T) {
 		WithArgs(5).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	if err := repo.Delete(5); err != nil {
+	if err := repo.Delete(context.Background(), 5); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
@@ -394,7 +395,7 @@ func TestMySQLPostRepositoryDeleteReturnsNotFound(t *testing.T) {
 		WithArgs(404).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	err := repo.Delete(404)
+	err := repo.Delete(context.Background(), 404)
 	if !errors.Is(err, ErrPostNotFound) {
 		t.Fatalf("Delete() error = %v, want %v", err, ErrPostNotFound)
 	}
@@ -411,9 +412,36 @@ func TestMySQLPostRepositoryDeleteReturnsExecError(t *testing.T) {
 		WithArgs(12).
 		WillReturnError(errors.New("delete failed"))
 
-	err := repo.Delete(12)
+	err := repo.Delete(context.Background(), 12)
 	if err == nil || err.Error() != "delete failed" {
 		t.Fatalf("Delete() error = %v, want delete failed", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet sql expectations: %v", err)
+	}
+}
+
+func TestMySQLPostRepositoryListReturnsDeadlineExceeded(t *testing.T) {
+	repo, mock := newMySQLRepositoryForTest(t)
+
+	rows := sqlmock.NewRows([]string{"id", "title", "content", "author", "created_at", "updated_at"}).
+		AddRow(1, "first", "content", "eson", time.Now(), time.Now())
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, title, content, author, created_at, updated_at
+		FROM posts
+		ORDER BY id DESC
+	`)).
+		WillDelayFor(50 * time.Millisecond).
+		WillReturnRows(rows)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	_, err := repo.List(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("List() error = %v, want %v", err, context.DeadlineExceeded)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

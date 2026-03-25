@@ -15,6 +15,7 @@ type AppConfig struct {
 	MaxOpenConns        int    `json:"max_open_conns"`
 	MaxIdleConns        int    `json:"max_idle_conns"`
 	ConnMaxLifetimeMins int    `json:"conn_max_lifetime_minutes"`
+	RequestTimeoutMs    int    `json:"request_timeout_ms"`
 }
 
 func Load(path string) (AppConfig, error) {
@@ -23,6 +24,7 @@ func Load(path string) (AppConfig, error) {
 		MaxOpenConns:        10,
 		MaxIdleConns:        5,
 		ConnMaxLifetimeMins: 5,
+		RequestTimeoutMs:    3000,
 	}
 
 	data, err := os.ReadFile(path)
@@ -50,6 +52,9 @@ func Load(path string) (AppConfig, error) {
 	if cfg.ConnMaxLifetimeMins <= 0 {
 		return AppConfig{}, fmt.Errorf("conn_max_lifetime_minutes must be greater than 0")
 	}
+	if cfg.RequestTimeoutMs <= 0 {
+		return AppConfig{}, fmt.Errorf("request_timeout_ms must be greater than 0")
+	}
 
 	return cfg, nil
 }
@@ -64,6 +69,10 @@ func (c AppConfig) Address() string {
 
 func (c AppConfig) ConnMaxLifetime() time.Duration {
 	return time.Duration(c.ConnMaxLifetimeMins) * time.Minute
+}
+
+func (c AppConfig) RequestTimeout() time.Duration {
+	return time.Duration(c.RequestTimeoutMs) * time.Millisecond
 }
 
 func (c AppConfig) PoolSummary() string {

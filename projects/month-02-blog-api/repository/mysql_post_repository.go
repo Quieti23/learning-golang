@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 
 	"month02blogapi/model"
@@ -14,14 +15,14 @@ func NewMySQLPostRepository(db *sql.DB) *MySQLPostRepository {
 	return &MySQLPostRepository{db: db}
 }
 
-func (r *MySQLPostRepository) List() ([]model.Post, error) {
-	rows, err := r.db.Query(`
+func (r *MySQLPostRepository) List(ctx context.Context) ([]model.Post, error) {
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, title, content, author, created_at, updated_at
 		FROM posts
 		ORDER BY id DESC
 	`)
 	if err != nil {
-		return nil, err
+		return nil, normalizeContextError(ctx, err)
 	}
 	defer rows.Close()
 
@@ -43,19 +44,19 @@ func (r *MySQLPostRepository) List() ([]model.Post, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, normalizeContextError(ctx, err)
 	}
 
 	return posts, nil
 }
 
-func (r *MySQLPostRepository) Create(post model.Post) (model.Post, error) {
-	result, err := r.db.Exec(`
+func (r *MySQLPostRepository) Create(ctx context.Context, post model.Post) (model.Post, error) {
+	result, err := r.db.ExecContext(ctx, `
 		INSERT INTO posts (title, content, author, created_at, updated_at)
 		VALUES (?, ?, ?, NOW(), NOW())
 	`, post.Title, post.Content, post.Author)
 	if err != nil {
-		return model.Post{}, err
+		return model.Post{}, normalizeContextError(ctx, err)
 	}
 
 	id, err := result.LastInsertId()
@@ -63,7 +64,7 @@ func (r *MySQLPostRepository) Create(post model.Post) (model.Post, error) {
 		return model.Post{}, err
 	}
 
-	row := r.db.QueryRow(`
+	row := r.db.QueryRowContext(ctx, `
 		SELECT id, title, content, author, created_at, updated_at
 		FROM posts
 		WHERE id = ?
@@ -78,14 +79,14 @@ func (r *MySQLPostRepository) Create(post model.Post) (model.Post, error) {
 		&createdPost.CreatedAt,
 		&createdPost.UpdatedAt,
 	); err != nil {
-		return model.Post{}, err
+		return model.Post{}, normalizeContextError(ctx, err)
 	}
 
 	return createdPost, nil
 }
 
-func (r *MySQLPostRepository) GetByID(id int) (model.Post, error) {
-	row := r.db.QueryRow(`
+func (r *MySQLPostRepository) GetByID(ctx context.Context, id int) (model.Post, error) {
+	row := r.db.QueryRowContext(ctx, `
 		SELECT id, title, content, author, created_at, updated_at
 		FROM posts
 		WHERE id = ?
@@ -100,6 +101,7 @@ func (r *MySQLPostRepository) GetByID(id int) (model.Post, error) {
 		&post.CreatedAt,
 		&post.UpdatedAt,
 	); err != nil {
+		err = normalizeContextError(ctx, err)
 		if err == sql.ErrNoRows {
 			return model.Post{}, ErrPostNotFound
 		}
@@ -110,14 +112,14 @@ func (r *MySQLPostRepository) GetByID(id int) (model.Post, error) {
 	return post, nil
 }
 
-func (r *MySQLPostRepository) Update(post model.Post) (model.Post, error) {
-	result, err := r.db.Exec(`
+func (r *MySQLPostRepository) Update(ctx context.Context, post model.Post) (model.Post, error) {
+	result, err := r.db.ExecContext(ctx, `
 		UPDATE posts
 		SET title = ?, content = ?, author = ?, updated_at = NOW()
 		WHERE id = ?
 	`, post.Title, post.Content, post.Author, post.ID)
 	if err != nil {
-		return model.Post{}, err
+		return model.Post{}, normalizeContextError(ctx, err)
 	}
 
 	affected, err := result.RowsAffected()
@@ -128,13 +130,13 @@ func (r *MySQLPostRepository) Update(post model.Post) (model.Post, error) {
 		return model.Post{}, ErrPostNotFound
 	}
 
-	return r.GetByID(post.ID)
+	return r.GetByID(ctx, post.ID)
 }
 
-func (r *MySQLPostRepository) Delete(id int) error {
-	result, err := r.db.Exec(`DELETE FROM posts WHERE id = ?`, id)
+func (r *MySQLPostRepository) Delete(ctx context.Context, id int) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM posts WHERE id = ?`, id)
 	if err != nil {
-		return err
+		return normalizeContextError(ctx, err)
 	}
 
 	affected, err := result.RowsAffected()
@@ -146,4 +148,16 @@ func (r *MySQLPostRepository) Delete(id int) error {
 	}
 
 	return nil
+}
+
+func normalizeContextError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+
+	return err
 }
