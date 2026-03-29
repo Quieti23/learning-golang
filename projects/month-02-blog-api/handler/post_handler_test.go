@@ -63,6 +63,9 @@ func TestPostHandlerCRUDFlow(t *testing.T) {
 	if notFound.statusCode != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, notFound.statusCode)
 	}
+	if notFound.body.Code != ErrorCodeNotFound {
+		t.Fatalf("expected code %q, got %q", ErrorCodeNotFound, notFound.body.Code)
+	}
 	if notFound.body.Message != repository.ErrPostNotFound.Error() {
 		t.Fatalf("expected message %q, got %q", repository.ErrPostNotFound.Error(), notFound.body.Message)
 	}
@@ -74,6 +77,9 @@ func TestPostHandlerRejectsUnknownFields(t *testing.T) {
 	response := performJSONRequest[errorResponse](t, h, http.MethodPost, "/posts", `{"title":"x","content":"y","author":"z","extra":"bad"}`)
 	if response.statusCode != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, response.statusCode)
+	}
+	if response.body.Code != ErrorCodeInvalidRequest {
+		t.Fatalf("expected code %q, got %q", ErrorCodeInvalidRequest, response.body.Code)
 	}
 	if response.body.Message != "request body contains unknown fields" {
 		t.Fatalf("unexpected error message: %q", response.body.Message)
@@ -87,6 +93,9 @@ func TestPostHandlerRejectsEmptyBody(t *testing.T) {
 	if response.statusCode != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, response.statusCode)
 	}
+	if response.body.Code != ErrorCodeInvalidRequest {
+		t.Fatalf("expected code %q, got %q", ErrorCodeInvalidRequest, response.body.Code)
+	}
 	if response.body.Message != "request body is required" {
 		t.Fatalf("unexpected error message: %q", response.body.Message)
 	}
@@ -98,6 +107,9 @@ func TestPostHandlerRejectsInvalidPostID(t *testing.T) {
 	response := performJSONRequest[errorResponse](t, h, http.MethodGet, "/posts/not-a-number", "")
 	if response.statusCode != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, response.statusCode)
+	}
+	if response.body.Code != ErrorCodeInvalidRequest {
+		t.Fatalf("expected code %q, got %q", ErrorCodeInvalidRequest, response.body.Code)
 	}
 	if response.body.Message != "invalid post id" {
 		t.Fatalf("unexpected error message: %q", response.body.Message)
@@ -114,11 +126,29 @@ func TestPostHandlerReturnsGatewayTimeoutWhenServiceContextExpires(t *testing.T)
 	if response.statusCode != http.StatusGatewayTimeout {
 		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, response.statusCode)
 	}
+	if response.body.Code != ErrorCodeRequestTimeout {
+		t.Fatalf("expected code %q, got %q", ErrorCodeRequestTimeout, response.body.Code)
+	}
 	if response.body.Message != "request timeout" {
 		t.Fatalf("unexpected error message: %q", response.body.Message)
 	}
 	if !repo.deadlineSet {
 		t.Fatal("expected handler to pass a context with deadline")
+	}
+}
+
+func TestPostHandlerMethodNotAllowedReturnsUnifiedError(t *testing.T) {
+	h := newTestHandler()
+
+	response := performJSONRequest[errorResponse](t, h, http.MethodPatch, "/posts", "")
+	if response.statusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status %d, got %d", http.StatusMethodNotAllowed, response.statusCode)
+	}
+	if response.body.Code != ErrorCodeMethodNotAllowed {
+		t.Fatalf("expected code %q, got %q", ErrorCodeMethodNotAllowed, response.body.Code)
+	}
+	if response.body.Message != "method not allowed" {
+		t.Fatalf("unexpected error message: %q", response.body.Message)
 	}
 }
 

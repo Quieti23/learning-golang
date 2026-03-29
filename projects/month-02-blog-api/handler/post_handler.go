@@ -34,10 +34,6 @@ type updatePostRequest struct {
 	Author  string `json:"author"`
 }
 
-type errorResponse struct {
-	Message string `json:"message"`
-}
-
 func NewPostHandler(postService service.PostService, logger *slog.Logger, timeout time.Duration) *PostHandler {
 	return &PostHandler{service: postService, logger: logger, timeout: timeout}
 }
@@ -68,7 +64,7 @@ func (h *PostHandler) handlePosts(w http.ResponseWriter, r *http.Request) {
 		var request createPostRequest
 		if err := decodeJSONBody(r, &request); err != nil {
 			requestLogger.Warn("decode post request failed", "error", err)
-			writeErrorJSON(w, http.StatusBadRequest, err.Error())
+			writeInvalidRequestError(w, err.Error())
 			return
 		}
 
@@ -84,9 +80,9 @@ func (h *PostHandler) handlePosts(w http.ResponseWriter, r *http.Request) {
 			requestLogger.Warn("create post failed", "error", err)
 			switch err {
 			case service.ErrTitleRequired, service.ErrContentRequired, service.ErrAuthorRequired:
-				writeErrorJSON(w, http.StatusBadRequest, err.Error())
+				writeInvalidRequestError(w, err.Error())
 			default:
-				writeErrorJSON(w, http.StatusInternalServerError, "internal server error")
+				h.writeServiceError(requestLogger, w, err)
 			}
 			return
 		}
@@ -95,7 +91,7 @@ func (h *PostHandler) handlePosts(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusCreated, post)
 	default:
 		requestLogger.Warn("method not allowed")
-		writeErrorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		writeMethodNotAllowedError(w)
 	}
 }
 
@@ -105,7 +101,7 @@ func (h *PostHandler) handlePostByID(w http.ResponseWriter, r *http.Request) {
 	id, err := parsePostID(r.URL.Path)
 	if err != nil {
 		requestLogger.Warn("invalid post id", "error", err)
-		writeErrorJSON(w, http.StatusBadRequest, "invalid post id")
+		writeInvalidRequestError(w, "invalid post id")
 		return
 	}
 
@@ -128,7 +124,7 @@ func (h *PostHandler) handlePostByID(w http.ResponseWriter, r *http.Request) {
 		var request updatePostRequest
 		if err := decodeJSONBody(r, &request); err != nil {
 			requestLogger.Warn("decode update post request failed", "error", err)
-			writeErrorJSON(w, http.StatusBadRequest, err.Error())
+			writeInvalidRequestError(w, err.Error())
 			return
 		}
 
@@ -160,7 +156,7 @@ func (h *PostHandler) handlePostByID(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		requestLogger.Warn("method not allowed")
-		writeErrorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		writeMethodNotAllowedError(w)
 	}
 }
 
@@ -169,26 +165,26 @@ func (h *PostHandler) writeServiceError(logger *slog.Logger, w http.ResponseWrit
 
 	switch err {
 	case service.ErrTitleRequired, service.ErrContentRequired, service.ErrAuthorRequired:
-		writeErrorJSON(w, http.StatusBadRequest, err.Error())
+		writeInvalidRequestError(w, err.Error())
 	case repository.ErrPostNotFound:
-		writeErrorJSON(w, http.StatusNotFound, err.Error())
+		writeErrorJSON(w, http.StatusNotFound, ErrorCodeNotFound, err.Error())
 	default:
 		if errors.Is(err, context.DeadlineExceeded) {
-			writeErrorJSON(w, http.StatusGatewayTimeout, "request timeout")
+			writeErrorJSON(w, http.StatusGatewayTimeout, ErrorCodeRequestTimeout, "request timeout")
 			return
 		}
 
 		if errors.Is(err, context.Canceled) {
-			writeErrorJSON(w, http.StatusRequestTimeout, "request canceled")
+			writeErrorJSON(w, http.StatusRequestTimeout, ErrorCodeRequestCanceled, "request canceled")
 			return
 		}
 
 		if errors.Is(err, repository.ErrPostNotFound) {
-			writeErrorJSON(w, http.StatusNotFound, repository.ErrPostNotFound.Error())
+			writeErrorJSON(w, http.StatusNotFound, ErrorCodeNotFound, repository.ErrPostNotFound.Error())
 			return
 		}
 
-		writeErrorJSON(w, http.StatusInternalServerError, "internal server error")
+		writeInternalError(w)
 	}
 }
 
@@ -207,10 +203,6 @@ func parsePostID(path string) (int, error) {
 	}
 
 	return strconv.Atoi(idText)
-}
-
-func writeErrorJSON(w http.ResponseWriter, statusCode int, message string) {
-	writeJSON(w, statusCode, errorResponse{Message: message})
 }
 
 func decodeJSONBody(r *http.Request, dst any) error {

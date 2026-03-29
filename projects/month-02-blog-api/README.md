@@ -41,8 +41,15 @@
 - `Create`、`List`、`GetByID`、`Update`、`Delete` 都通过 `QueryContext`、`QueryRowContext`、`ExecContext` 访问 `posts` 表
 - `sql.ErrNoRows` 会在 repository 层转换成 `post not found`
 - 超时会返回 `504 request timeout`
-- handler 层会把常见错误映射成 `400 / 404 / 500`
+- handler 层会把常见错误映射成统一结构：`{"code":"...","message":"..."}`
 - `main.go` 会应用基础连接池配置
+
+## 当前错误返回
+
+- 统一错误结构：`{"code":"NOT_FOUND","message":"post not found"}`
+- 业务错误：`INVALID_REQUEST`、`NOT_FOUND`
+- 系统错误：`REQUEST_TIMEOUT`、`REQUEST_CANCELED`、`INTERNAL_ERROR`
+- 非法方法：`METHOD_NOT_ALLOWED`
 
 ## 当前数据库迁移
 
@@ -164,3 +171,9 @@ Invoke-WebRequest -Method Post http://localhost:8081/posts \
 - 多余字段或非法 JSON 返回 `400`
 - 数据库调用超过 `request_timeout_ms` 时返回 `504`
 - 正常 CRUD 返回 `200 / 201 / 204`
+
+错误响应示例：
+
+```json
+{"code":"NOT_FOUND","message":"post not found"}
+```
