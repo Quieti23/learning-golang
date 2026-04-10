@@ -30,6 +30,8 @@
 - 学 unbuffered channel 的发送接收语义
 - 理解为什么没有接收方时发送会阻塞
 - 输出：写 2 个 demo，分别验证同步通信和阻塞现象
+- 参考产物：`demos/month-03/channel-unbuffered-sync-demo`
+- 参考产物：`demos/month-03/channel-unbuffered-blocking-demo`
 
 ### Day 3
 
