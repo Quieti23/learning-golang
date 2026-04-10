@@ -23,6 +23,7 @@
 - 学 goroutine 的启动方式和调度直觉
 - 对比 Java 线程池心智和 Go goroutine 心智
 - 输出：写 1 个最小 goroutine demo，观察输出顺序
+- 参考产物：`demos/month-03/goroutine-basic-demo`
 
 ### Day 2
 
