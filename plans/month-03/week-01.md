@@ -37,6 +37,7 @@
 
 - 学 buffered channel 的容量、阻塞边界和典型用途
 - 输出：写 1 个 buffered channel demo，记录满和空时的行为
+- 参考产物：`demos/month-03/channel-buffered-demo`
 
 ### Day 4
 
