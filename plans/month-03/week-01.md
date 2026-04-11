@@ -44,6 +44,7 @@
 - 学 `select` 的基本写法
 - 用 `time.After` 做超时控制
 - 输出：写 1 个超时等待 demo
+- 参考产物：`demos/month-03/select-timeout-demo`
 
 ### Day 5
 
